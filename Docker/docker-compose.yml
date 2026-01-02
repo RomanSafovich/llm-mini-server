@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+  api:
+    # Build your FastAPI + Transformers image (Dockerfile in same folder)
+    build: .
+    container_name: llm-api
+    image: mistral-fastapi
+    ports:
+      - "8000:8000"
+    # Keep environment configurable
+    environment:
+      # Toggle later if you add vLLM
+      - USE_VLLM=false
+      - MODEL=mistralai/Mistral-7B-Instruct-v0.2
+      - HF_HOME=/root/.cache/huggingface
+    # Mount Hugging Face cache so models persist between runs
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    # Enable GPU access (requires NVIDIA Container Toolkit)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
+    # Uncomment for NVIDIA runtime on older Docker versions
+    # runtime: nvidia
+    restart: unless-stopped
+    command: ["tail", "-f", "/dev/null"]
+
+  # (Optional, easy future add-on)
+  # vllm:
+  #   image: vllm/vllm-openai:latest
+  #   container_name: vllm-server
+  #   ports:
+  #     - "8001:8001"
+  #   command: >
+  #     --model mistralai/Mistral-7B-Instruct-v0.2
+  #     --dtype float16
+  #     --gpu-memory-utilization 0.88
+  #     --max-model-len 8192
+  #     --port 8001
+  #   environment:
+  #     - HF_HOME=/root/.cache/huggingface
+  #   volumes:
+  #     - ~/.cache/huggingface:/root/.cache/huggingface
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - capabilities: ["gpu"]
+  #   restart: unless-stopped
