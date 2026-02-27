@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
         "torch==2.4.1+cu121" "torchvision==0.19.1+cu121" "torchaudio==2.4.1+cu121" \
         --index-url https://download.pytorch.org/whl/cu121 && \
-    pip install --no-cache-dir sentencepiece fastapi uvicorn[standard] transformers accelerate
+    pip install --no-cache-dir sentencepiece fastapi uvicorn[standard] transformers accelerate sentence-transformers
 
 # ✅ Pre-download Mistral into /models
 # RUN python3 - << 'EOF'
