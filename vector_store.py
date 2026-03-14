@@ -17,7 +17,7 @@ class InMemoryVectorStore:
         
 
 
-    def add(self, item):
+    def add_one(self, item):
         self._validate_item(item)
         self.items.append(item)
 
@@ -39,23 +39,24 @@ class InMemoryVectorStore:
         if not self.items:
             return []
 
-        score_item_pair = []
+        scored_pairs = []
 
         for item in self.items:
-            score_item_pair.append((float(np.dot(query_vector, item["embedding"])), item)) 
+            scored_pairs.append((float(np.dot(query_vector, item["embedding"])), item)) 
 
         
-        score_item_pair.sort(key=lambda x: x[0], reverse=True)
+        scored_pairs.sort(key=lambda x: x[0], reverse=True)
 
         scored_items = []
 
-        for pair in score_item_pair[:top_k]:
+        for pair in scored_pairs[:top_k]:
             scored_items.append(
                 {
                     "score": pair[0],
                     "id": pair[1]["id"],
                     "text": pair[1]["text"],
-                    "metadata":  pair[1]["metadata"]
+                    "metadata":  pair[1]["metadata"],
+                    "embedding": pair[1]["embedding"]
 
                 }
             )
