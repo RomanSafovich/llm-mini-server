@@ -8,6 +8,15 @@ import uvicorn
 from typing import Any
 from vector_store import InMemoryVectorStore
 from embeddings import Embedder
+import numpy as np
+
+NEAR_DUPLICATE_COSINE_THRESHOLD = 0.97
+SCORE_THRESHOLD = 0.65
+MARGIN_THRESHOLD = 0.03
+MAX_TOP_K = 5
+MAX_CONTEXT_CHARS = 6000
+MAX_CHUNK_SNIPPET_CHARS = 800
+SOURCE_SNIPPET_CHARS = 300
 
 app = FastAPI()
 
@@ -61,11 +70,19 @@ class IngestTextResponse(BaseModel):
 class ChatRagRequest(BaseModel):
     question: str
     top_k: int = 3
+    debug: bool = False
 
+
+class SourceOut(BaseModel):
+    id: str
+    score: float
+    metadata: dict[str, Any]
+    snippet: str
+    text: str | None = None
 
 class ChatRagResponse(BaseModel):
     answer: str
-    sources: list[dict[str, Any]] = Field(default_factory=list)
+    sources: list[SourceOut] = Field(default_factory=list)
     retrieved_count: int = 0
 
 def chunk_text(text: str, chunk_size: int=800, overlap: int=150):
@@ -162,8 +179,10 @@ def generate_text(prompt_str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.post("/chat_rag", response_model=ChatRagResponse)
 def chat_rag(req: ChatRagRequest):
+    global i
     question = req.question.strip()
 
     if not question:
@@ -171,8 +190,27 @@ def chat_rag(req: ChatRagRequest):
 
 
     query_vector = embedder.encode_one(question)
-    hits = store.search(query_vector, req.top_k)
+    effective_top_k = min(req.top_k, MAX_TOP_K)
+    hits = store.search(query_vector, effective_top_k)
+
+    unique_hits = []
+    for hit in hits:
+        sim = 0
+        is_duplicate = False
+        for unique_hit in unique_hits:
+            sim = np.dot(hit["embedding"], unique_hit["embedding"])
+            if sim > NEAR_DUPLICATE_COSINE_THRESHOLD:
+                is_duplicate = True
+                break
+        
+        if not is_duplicate:
+            unique_hits.append(hit)
+
+    hits = unique_hits
+
+    
     retrieved_count = len(hits)
+
 
     if retrieved_count == 0:
         return  ChatRagResponse(
@@ -181,21 +219,79 @@ def chat_rag(req: ChatRagRequest):
             retrieved_count=0
         )
 
-    concat_text = ""
-    for i, hit in enumerate(hits):
-        concat_text += f"SOURCE {i+1}\n{hit['text']}\n\n" 
+    top1_score = hits[0]["score"]
+    top2_score = hits[1]["score"] if retrieved_count > 1 else 0
+    margin = top1_score - top2_score
+    top_k_scores = [h["score"] for h in hits]
+    print(f"top1_score={top1_score}, top2_score={top2_score}, margin={margin},top_k_scores={top_k_scores}")
 
-    augmented_prompt = f"Instruction:\nAnswer using only the context below. If the answer is not in the context, say you don’t know.\n" \
-                    f"Context:\n{concat_text}\n" \
-                    f"Question:\n{question}\n" \
-                    f"Answer:\n"
-                    
-    ans = generate_text(augmented_prompt)
-    return ChatRagResponse(
-        answer=ans,
-        sources=hits,
-        retrieved_count=retrieved_count
-    )
+    if top1_score < SCORE_THRESHOLD or margin < MARGIN_THRESHOLD:
+        print("MODE: fallback")
+        ans = generate_text(question)
+        return ChatRagResponse (
+            answer=ans,
+            sources=[],
+            retrieved_count=0
+        )
+    else:
+        print("MODE: rag")
+        used_hits = []
+        concat_text = ""
+        used_chars = 0
+        used_chunks = 0
+        for i, hit in enumerate(hits):
+            snippet = hit["text"][:MAX_CHUNK_SNIPPET_CHARS]
+            block = f"SOURCE {i+1}\n{snippet}\n\n"
+            if len(block) +used_chars > MAX_CONTEXT_CHARS:
+                break
+            used_chars += len(block)
+            used_chunks += 1
+            concat_text += block
+            used_hits.append(hit)
+
+        print(f"CTX: effective_top_k={effective_top_k}, used_chunks={used_chunks}, used_chars={used_chars}")
+        # for i, hit in enumerate(hits):
+        #     concat_text += f"SOURCE {i+1}\n{hit['text']}\n\n" 
+
+        sources_out = []
+        for hit in used_hits:
+            snippet = hit["text"][:SOURCE_SNIPPET_CHARS]
+            text = hit["text"] if req.debug else None
+            sources_out.append(
+                SourceOut(
+                    id = hit["id"],
+                    score = hit["score"],
+                    metadata = hit["metadata"],
+                    snippet = snippet,
+                    text = text
+                )
+            ) 
+            
+
+        # augmented_prompt = "Instruction:\n" \
+        #                 "Answer using only the context below. If the answer is not explicitly in the context, reply exactly: \"I don’t know based on the provided context.\"\n" \
+        #                 "Do not guess or add external knowledge.\n" \
+        #                 "When you use a fact, cite it like [SOURCE 1].\n" \
+        #                 f"Context:\n{concat_text}\n" \
+        #                 f"Question:\n{question}\n" \
+        #                 f"Answer:\n"
+        n_sources = len(used_hits)
+        augmented_prompt = "Instruction:\n" \
+            "Answer using only the context below.\n" \
+            "The context is divided into blocks labeled SOURCE 1, SOURCE 2, etc. When you use a fact, cite it like [SOURCE 1] or [SOURCE 2].\n" \
+            f"Only cite sources that exist in the context: SOURCE 1 to SOURCE {n_sources}. Do not invent other source numbers.\n" \
+            "If the context does not contain the information needed to answer the question, reply exactly: \"I don’t know based on the provided context.\"\n" \
+            "Do not guess or add external knowledge.\n" \
+            f"Context:\n{concat_text}\n" \
+            f"Question:\n{question}\n" \
+            f"Answer:\n"
+                        
+        ans = generate_text(augmented_prompt)
+        return ChatRagResponse(
+            answer=ans,
+            sources=sources_out,
+            retrieved_count=len(used_hits)
+        )
 
 
 @app.post("/chat")
