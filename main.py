@@ -268,13 +268,6 @@ def chat_rag(req: ChatRagRequest):
             ) 
             
 
-        # augmented_prompt = "Instruction:\n" \
-        #                 "Answer using only the context below. If the answer is not explicitly in the context, reply exactly: \"I don’t know based on the provided context.\"\n" \
-        #                 "Do not guess or add external knowledge.\n" \
-        #                 "When you use a fact, cite it like [SOURCE 1].\n" \
-        #                 f"Context:\n{concat_text}\n" \
-        #                 f"Question:\n{question}\n" \
-        #                 f"Answer:\n"
         n_sources = len(used_hits)
         augmented_prompt = "Instruction:\n" \
             "Answer using only the context below.\n" \
