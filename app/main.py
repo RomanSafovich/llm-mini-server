@@ -1,45 +1,43 @@
 from fastapi import FastAPI, HTTPException
-
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from app.schemas import (
+    Prompt, 
+    IngestTextRequest, 
+    IngestTextResponse, 
+    ChatRagRequest, 
+    SourceOut, 
+    ChatRagResponse
+)
+from transformers import (
+    AutoModelForCausalLM, 
+    AutoTokenizer
+)
 import torch
-from pydantic import BaseModel, Field
-import requests
 import uvicorn
-from typing import Any
-from vector_store import InMemoryVectorStore
-from embeddings import Embedder
 import numpy as np
-
-NEAR_DUPLICATE_COSINE_THRESHOLD = 0.97
-SCORE_THRESHOLD = 0.65
-MARGIN_THRESHOLD = 0.03
-MAX_TOP_K = 5
-MAX_CONTEXT_CHARS = 6000
-MAX_CHUNK_SNIPPET_CHARS = 800
-SOURCE_SNIPPET_CHARS = 300
+from app import config
+from app.store.vector_store import InMemoryVectorStore
+from app.embeddings.embedder import Embedder
 
 app = FastAPI()
 
 
-class Prompt(BaseModel):
-    prompt: str
+
 
 store = InMemoryVectorStore()
 embedder = Embedder(model_name="BAAI/bge-small-en-v1.5")
-# Load model and tokenizer once at startup
-MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
+# Load model and tokenizer at startup
 
 print("Loading model... this may take a minute ⏳")
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+tokenizer = AutoTokenizer.from_pretrained(config.MODEL_NAME)
 
 # GPU if available; otherwise CPU
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# For CPU use float32; for GPU you can use float16
+# using float32 for CPU; using float16 for GPU
 dtype = torch.float16 if device == "cuda" else torch.float32
 
 model = AutoModelForCausalLM.from_pretrained(
-    MODEL_NAME,
+    config.MODEL_NAME,
     torch_dtype=dtype,
     low_cpu_mem_usage=True,  # helpful even without accelerate
 )
@@ -51,39 +49,7 @@ print("Model loaded ✅ (cuda? ", torch.cuda.is_available(), ")")
 model.eval()
 
 
-class Prompt(BaseModel):
-    prompt: str
 
-
-
-class IngestTextRequest(BaseModel):
-    doc_id: str
-    text: str
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-class IngestTextResponse(BaseModel):
-    doc_id: str
-    chunks_added: int
-    total_chunks: int
-
-
-class ChatRagRequest(BaseModel):
-    question: str
-    top_k: int = 3
-    debug: bool = False
-
-
-class SourceOut(BaseModel):
-    id: str
-    score: float
-    metadata: dict[str, Any]
-    snippet: str
-    text: str | None = None
-
-class ChatRagResponse(BaseModel):
-    answer: str
-    sources: list[SourceOut] = Field(default_factory=list)
-    retrieved_count: int = 0
 
 def chunk_text(text: str, chunk_size: int=800, overlap: int=150):
     if chunk_size <= 0:
@@ -190,7 +156,7 @@ def chat_rag(req: ChatRagRequest):
 
 
     query_vector = embedder.encode_one(question)
-    effective_top_k = min(req.top_k, MAX_TOP_K)
+    effective_top_k = min(req.top_k, config.MAX_TOP_K)
     hits = store.search(query_vector, effective_top_k)
 
     unique_hits = []
@@ -199,7 +165,7 @@ def chat_rag(req: ChatRagRequest):
         is_duplicate = False
         for unique_hit in unique_hits:
             sim = np.dot(hit["embedding"], unique_hit["embedding"])
-            if sim > NEAR_DUPLICATE_COSINE_THRESHOLD:
+            if sim > config.NEAR_DUPLICATE_COSINE_THRESHOLD:
                 is_duplicate = True
                 break
         
@@ -225,7 +191,7 @@ def chat_rag(req: ChatRagRequest):
     top_k_scores = [h["score"] for h in hits]
     print(f"top1_score={top1_score}, top2_score={top2_score}, margin={margin},top_k_scores={top_k_scores}")
 
-    if top1_score < SCORE_THRESHOLD or margin < MARGIN_THRESHOLD:
+    if top1_score < config.SCORE_THRESHOLD or margin < config.MARGIN_THRESHOLD:
         print("MODE: fallback")
         ans = generate_text(question)
         return ChatRagResponse (
@@ -240,9 +206,9 @@ def chat_rag(req: ChatRagRequest):
         used_chars = 0
         used_chunks = 0
         for i, hit in enumerate(hits):
-            snippet = hit["text"][:MAX_CHUNK_SNIPPET_CHARS]
+            snippet = hit["text"][:config.MAX_CHUNK_SNIPPET_CHARS]
             block = f"SOURCE {i+1}\n{snippet}\n\n"
-            if len(block) +used_chars > MAX_CONTEXT_CHARS:
+            if len(block) + used_chars > config.MAX_CONTEXT_CHARS:
                 break
             used_chars += len(block)
             used_chunks += 1
@@ -255,7 +221,7 @@ def chat_rag(req: ChatRagRequest):
 
         sources_out = []
         for hit in used_hits:
-            snippet = hit["text"][:SOURCE_SNIPPET_CHARS]
+            snippet = hit["text"][:config.SOURCE_SNIPPET_CHARS]
             text = hit["text"] if req.debug else None
             sources_out.append(
                 SourceOut(
