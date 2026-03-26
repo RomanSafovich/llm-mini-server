@@ -14,7 +14,7 @@ from transformers import (
 import torch
 import uvicorn
 from app import config
-from app.store.vector_store import InMemoryVectorStore
+from app.store.vector_store import MemoryVectorStore
 from app.embeddings.embedder import Embedder
 from app.llm import generate_text
 from app.ingest import chunk_text, run_ingest
@@ -23,7 +23,7 @@ from app.rag import run_chat_rag
 app = FastAPI()
 
 
-store = InMemoryVectorStore()
+store = MemoryVectorStore()
 embedder = Embedder(model_name="BAAI/bge-small-en-v1.5")
 # Load model and tokenizer at startup
 

@@ -45,7 +45,6 @@ def run_chat_rag(req: ChatRagRequest, store, embedder, model, tokenizer) -> Chat
 
         sources_out = build_sources_out(used_hits, req.debug)
 
-        n_sources = len(used_hits)
         augmented_prompt = build_augmented_prompt(concat_text, question, n_sources=len(used_hits))
                         
         ans = generate_text(augmented_prompt, tokenizer=tokenizer, model=model)
@@ -57,8 +56,8 @@ def run_chat_rag(req: ChatRagRequest, store, embedder, model, tokenizer) -> Chat
 
 
 def retrieve_unique_hits(question, effective_top_k, store, embedder):
-    query_vector = embedder.encode_one(question)
-    hits = store.search(query_vector, effective_top_k)
+    query_embedding = embedder.encode_one(question)
+    hits = store.search(query_embedding, effective_top_k)
 
     unique_hits = []
     for hit in hits:

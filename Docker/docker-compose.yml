@@ -2,31 +2,95 @@ version: "3.9"
 
 services:
   api:
-    # Build your FastAPI + Transformers image (Dockerfile in same folder)
     build: .
     container_name: llm-api
     image: mistral-fastapi
     ports:
       - "8000:8000"
-    # Keep environment configurable
     environment:
       # Toggle later if you add vLLM
       - USE_VLLM=false
       - MODEL=mistralai/Mistral-7B-Instruct-v0.2
       - HF_HOME=/root/.cache/huggingface
-    # Mount Hugging Face cache so models persist between runs
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
-    # Enable GPU access (requires NVIDIA Container Toolkit)
     deploy:
       resources:
         reservations:
           devices:
             - capabilities: ["gpu"]
-    # Uncomment for NVIDIA runtime on older Docker versions
-    # runtime: nvidia
     restart: unless-stopped
     command: ["tail", "-f", "/dev/null"]
+
+
+  etcd:
+    container_name: milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.25
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/etcd:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  minio:
+    container_name: milvus-minio
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/minio:/minio_data
+    command: minio server /minio_data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  standalone:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.6.13
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+    - seccomp:unconfined
+    restart: unless-stopped
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MQ_TYPE: woodpecker
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/milvus:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      - "etcd"
+      - "minio"
+
+  attu:
+    image: zilliz/attu:v2.3.6
+    container_name: attu_container
+    ports:
+      - "8001:3000"
+    environment:
+      - MILVUS_URL=milvus-standalone:19530
+    restart: unless-stopped
 
   # (Optional, easy future add-on)
   # vllm:
