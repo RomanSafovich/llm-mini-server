@@ -33,3 +33,14 @@ class ChatRagResponse(BaseModel):
     answer: str
     sources: list[SourceOut] = Field(default_factory=list)
     retrieved_count: int = 0
+
+class GetDocsResponse(BaseModel):
+    doc_id: str
+    chunk_count: int
+
+class MessageResponse(BaseModel):
+    message: str
+
+
+class ChatResponse(BaseModel):
+    answer: str

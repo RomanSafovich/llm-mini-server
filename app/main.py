@@ -4,8 +4,10 @@ from app.schemas import (
     IngestTextRequest, 
     IngestTextResponse, 
     ChatRagRequest, 
-    SourceOut, 
-    ChatRagResponse
+    ChatRagResponse,
+    GetDocsResponse,
+    MessageResponse,
+    ChatResponse
 )
 from transformers import (
     AutoModelForCausalLM, 
@@ -14,18 +16,18 @@ from transformers import (
 import torch
 import uvicorn
 from app import config
-from app.store.vector_store import MemoryVectorStore
+from app.store.milvus_store import MilvusVectorStore
 from app.embeddings.embedder import Embedder
 from app.llm import generate_text
-from app.ingest import chunk_text, run_ingest
+from app.ingest import run_ingest
 from app.rag import run_chat_rag
 
 app = FastAPI()
 
 
-store = MemoryVectorStore()
+store = MilvusVectorStore()
+
 embedder = Embedder(model_name="BAAI/bge-small-en-v1.5")
-# Load model and tokenizer at startup
 
 print("Loading model... this may take a minute ⏳")
 tokenizer = AutoTokenizer.from_pretrained(config.MODEL_NAME)
@@ -47,6 +49,25 @@ print("Model loaded ✅")
 print("Model loaded ✅ (cuda? ", torch.cuda.is_available(), ")")
 model.eval()
 
+@app.get("/documents", response_model=list[GetDocsResponse])
+def get_docs():
+    return store.list_docs()
+
+@app.delete("/documents/{doc_id}", response_model=MessageResponse)
+def delete_document(doc_id: str):
+    doc_id = doc_id.strip()
+    if not doc_id:
+        raise HTTPException(status_code=400, detail="doc_id must not be blank")
+
+    if not store.delete_doc(doc_id):
+        raise HTTPException(404, detail=f"Document {doc_id} not found")
+
+    return {"message": f'document {doc_id} deleted successfully'}
+
+@app.post("/documents/clear", response_model=MessageResponse)
+def clear_documents():
+    store.clear()
+    return {"message": "documents have been cleared successfully"}
 
 @app.post("/ingest_text", response_model=IngestTextResponse)
 def ingest_text(req: IngestTextRequest):
@@ -58,12 +79,11 @@ def chat_rag(req: ChatRagRequest):
     return run_chat_rag(req, store=store, embedder=embedder, model=model, tokenizer=tokenizer)
 
 
-@app.post("/chat")
+@app.post("/chat", response_model=ChatResponse)
 def chat_llm(prompt: Prompt):
     return {
         "answer": generate_text(prompt.prompt, tokenizer=tokenizer, model=model)
     }
-
 
 
 if __name__ == "__main__":

@@ -58,7 +58,6 @@ def run_chat_rag(req: ChatRagRequest, store, embedder, model, tokenizer) -> Chat
 def retrieve_unique_hits(question, effective_top_k, store, embedder):
     query_embedding = embedder.encode_one(question)
     hits = store.search(query_embedding, effective_top_k)
-
     unique_hits = []
     for hit in hits:
         sim = 0
@@ -71,7 +70,6 @@ def retrieve_unique_hits(question, effective_top_k, store, embedder):
         
         if not is_duplicate:
             unique_hits.append(hit)
-
 
     return unique_hits 
 
