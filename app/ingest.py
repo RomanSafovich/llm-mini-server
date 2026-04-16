@@ -67,7 +67,7 @@ def run_ingest(req: IngestTextRequest, store, embedder) -> IngestTextResponse:
         }
         items.append(item)
 
-    store.add_many(items)
+    store.upsert(items)
 
     return IngestTextResponse(
         doc_id=doc_id,

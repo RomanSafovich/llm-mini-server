@@ -1,6 +1,8 @@
 import numpy as np
+from .base import VectorStore
+from collections import defaultdict
 
-class InMemoryVectorStore:
+class MemoryVectorStore(VectorStore):
     def __init__(self):
         self.items = []
 
@@ -15,14 +17,12 @@ class InMemoryVectorStore:
             raise ValueError(f"Missing required keys: {sorted(missing)}")
 
         
-
-
-    def add_one(self, item):
-        self._validate_item(item)
-        self.items.append(item)
+    # def add_one(self, item):
+    #     self._validate_item(item)
+    #     self.items.append(item)
 
             
-    def add_many(self, items):
+    def upsert(self, items: list[dict]):
         if not isinstance(items, list):
             raise TypeError(f"items must be list, got {type(items).__name__}")
 
@@ -32,7 +32,7 @@ class InMemoryVectorStore:
         self.items.extend(items)
 
 
-    def search(self, query_vector, top_k):
+    def search(self, query_embedding: list[float], top_k: int, filters=None) -> list[dict]:
         if top_k <= 0:
             raise ValueError("top_k must be a positive number")
 
@@ -42,7 +42,7 @@ class InMemoryVectorStore:
         scored_pairs = []
 
         for item in self.items:
-            scored_pairs.append((float(np.dot(query_vector, item["embedding"])), item)) 
+            scored_pairs.append((float(np.dot(query_embedding, item["embedding"])), item)) 
 
         
         scored_pairs.sort(key=lambda x: x[0], reverse=True)
@@ -66,14 +66,30 @@ class InMemoryVectorStore:
     def count(self):
         return len(self.items)
 
+    def delete_doc(self, doc_id: str):
+        self.items = [item for item in self.items if item["metadata"].get("doc_id") != doc_id]
+
+
+    def list_docs(self) -> list[dict]:
+        docs = []
+        chunk_count = defaultdict(int)
+        for item in self.items:
+            doc_id = item["metadata"].get("doc_id")
+            if doc_id is None:
+                continue
+            chunk_count[doc_id] += 1
+
+        for doc_id, count in chunk_count.items():
+
+            docs.append(
+                {
+                    "doc_id": doc_id,
+                    "chunk_count": count
+
+                }
+            )
+
+        return docs
     
     def clear(self):
         self.items.clear()
-
-
-
-
-
-# m = InMemoryVectorStore()
-
-# m._validate_item({"id": "dasdsad", "text": "fsdff"})
