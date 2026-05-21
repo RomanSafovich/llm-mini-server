@@ -1,7 +1,7 @@
 from app.schemas import ChatRagRequest, ChatRagResponse, SourceOut
 from app.llm import generate_text
 from app.logger import logger
-from app import config
+from app.config import settings
 import numpy as np
 from fastapi import HTTPException
 
@@ -12,7 +12,7 @@ def run_chat_rag(req: ChatRagRequest, store, embedder, model, tokenizer) -> Chat
         raise HTTPException(status_code=400, detail="question must not be blank")
 
 
-    effective_top_k = min(req.top_k, config.MAX_TOP_K)
+    effective_top_k = min(req.top_k, settings.max_top_k)
     hits = retrieve_unique_hits(question, effective_top_k=effective_top_k, store=store, embedder=embedder)
     retrieved_count = len(hits)
 
@@ -30,7 +30,7 @@ def run_chat_rag(req: ChatRagRequest, store, embedder, model, tokenizer) -> Chat
     top_k_scores = [h["score"] for h in hits]
     logger.info(f"top1_score={top1_score}, top2_score={top2_score}, margin={margin},top_k_scores={top_k_scores}")
 
-    if top1_score < config.SCORE_THRESHOLD or margin < config.MARGIN_THRESHOLD:
+    if top1_score < settings.score_threshold or margin < settings.margin_threshold:
         logger.info("MODE: fallback")
         ans = generate_text(question, tokenizer=tokenizer, model=model)
         return ChatRagResponse (
@@ -65,7 +65,7 @@ def retrieve_unique_hits(question, effective_top_k, store, embedder):
         is_duplicate = False
         for unique_hit in unique_hits:
             sim = np.dot(hit["embedding"], unique_hit["embedding"])
-            if sim > config.NEAR_DUPLICATE_COSINE_THRESHOLD:
+            if sim > settings.near_duplicate_cosine_threshold:
                 is_duplicate = True
                 break
         
@@ -81,9 +81,9 @@ def build_context(hits):
     used_chars = 0
     used_chunks = 0
     for i, hit in enumerate(hits):
-        snippet = hit["text"][:config.MAX_CHUNK_SNIPPET_CHARS]
+        snippet = hit["text"][:settings.max_chunk_snippet_chars]
         block = f"SOURCE {i+1}\n{snippet}\n\n"
-        if len(block) + used_chars > config.MAX_CONTEXT_CHARS:
+        if len(block) + used_chars > settings.max_context_chars:
             break
         used_chars += len(block)
         used_chunks += 1
@@ -97,7 +97,7 @@ def build_context(hits):
 def build_sources_out(used_hits, debug):
     sources_out = []
     for hit in used_hits:
-        snippet = hit["text"][:config.SOURCE_SNIPPET_CHARS]
+        snippet = hit["text"][:settings.source_snippet_chars]
         text = hit["text"] if debug else None
         sources_out.append(
             SourceOut(

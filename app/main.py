@@ -16,7 +16,7 @@ from transformers import (
 )
 import torch
 import uvicorn
-from app import config
+from app.config import settings
 from app.store.milvus_store import MilvusVectorStore
 from app.embeddings.embedder import Embedder
 from app.llm import generate_text
@@ -29,10 +29,10 @@ app = FastAPI()
 
 store = MilvusVectorStore()
 
-embedder = Embedder(model_name="BAAI/bge-small-en-v1.5")
+embedder = Embedder(model_name=settings.embedder_model_name)
 
-logger.info(f"Loading model {config.MODEL_NAME}... this may take a minute ⏳")
-tokenizer = AutoTokenizer.from_pretrained(config.MODEL_NAME)
+logger.info(f"Loading model {settings.llm_model_name}... this may take a minute ⏳")
+tokenizer = AutoTokenizer.from_pretrained(settings.llm_model_name)
 
 # GPU if available; otherwise CPU
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -49,14 +49,14 @@ if device == "cuda":
     )
 
     model = AutoModelForCausalLM.from_pretrained(
-        config.MODEL_NAME,
+        settings.llm_model_name,
         quantization_config=bnb_config,
         low_cpu_mem_usage=True,
         device_map="auto",
     )
 else:
     model = AutoModelForCausalLM.from_pretrained(
-        config.MODEL_NAME,
+        settings.llm_model_name,
         torch_dtype=torch.float32,
         low_cpu_mem_usage=True,
     )
