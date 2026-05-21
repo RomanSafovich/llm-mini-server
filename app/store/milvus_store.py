@@ -1,6 +1,7 @@
 from .base import VectorStore
 from pymilvus import MilvusClient, DataType
 from collections import Counter
+from app.logger import logger
 
 
 class MilvusVectorStore(VectorStore):
@@ -111,7 +112,7 @@ class MilvusVectorStore(VectorStore):
             return deleted > 0
                 
         except Exception as e:
-            print(f"Delete failed with error: {e}")
+            logger.exception(f"Delete failed with error: {e}")
             return False
 
     def clear(self):
