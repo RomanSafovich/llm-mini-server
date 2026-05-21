@@ -1,10 +1,20 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-NEAR_DUPLICATE_COSINE_THRESHOLD = 0.97
-SCORE_THRESHOLD = 0.65
-MARGIN_THRESHOLD = 0.03
-MAX_TOP_K = 5
-MAX_CONTEXT_CHARS = 6000
-MAX_CHUNK_SNIPPET_CHARS = 800
-SOURCE_SNIPPET_CHARS = 300
-MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
-LOGGER_NAME = "llm-mini-server"
+
+class Settings(BaseSettings):
+    llm_model_name: str = "mistralai/Mistral-7B-Instruct-v0.2"
+    logger_name: str = "llm-mini-server"
+    embedder_model_name: str = "BAAI/bge-small-en-v1.5"
+    near_duplicate_cosine_threshold: float = 0.97
+    score_threshold: float = 0.65
+    margin_threshold: float = 0.03
+    max_top_k: int = 5
+    max_context_chars: int = 6000
+    max_chunk_snippet_chars: int = 800
+    source_snippet_chars: int = 300
+
+
+    model_config = SettingsConfigDict(env_file=".env")
+
+
+settings = Settings()

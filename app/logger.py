@@ -1,6 +1,6 @@
 import logging
 import sys
-from app.config import LOGGER_NAME
+from app.config import settings
 
 
 LOG_FORMAT = "{asctime} - {name} - {levelname} - {message}"
@@ -22,4 +22,4 @@ def setup_logger(name):
 
 
 
-logger = setup_logger(LOGGER_NAME)
+logger = setup_logger(settings.logger_name)
