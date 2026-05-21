@@ -7,3 +7,4 @@ MAX_CONTEXT_CHARS = 6000
 MAX_CHUNK_SNIPPET_CHARS = 800
 SOURCE_SNIPPET_CHARS = 300
 MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
+LOGGER_NAME = "llm-mini-server"

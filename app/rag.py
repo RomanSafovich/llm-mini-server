@@ -1,5 +1,6 @@
 from app.schemas import ChatRagRequest, ChatRagResponse, SourceOut
 from app.llm import generate_text
+from app.logger import logger
 from app import config
 import numpy as np
 from fastapi import HTTPException
@@ -27,10 +28,10 @@ def run_chat_rag(req: ChatRagRequest, store, embedder, model, tokenizer) -> Chat
     top2_score = hits[1]["score"] if retrieved_count > 1 else 0
     margin = top1_score - top2_score
     top_k_scores = [h["score"] for h in hits]
-    print(f"top1_score={top1_score}, top2_score={top2_score}, margin={margin},top_k_scores={top_k_scores}")
+    logger.info(f"top1_score={top1_score}, top2_score={top2_score}, margin={margin},top_k_scores={top_k_scores}")
 
     if top1_score < config.SCORE_THRESHOLD or margin < config.MARGIN_THRESHOLD:
-        print("MODE: fallback")
+        logger.info("MODE: fallback")
         ans = generate_text(question, tokenizer=tokenizer, model=model)
         return ChatRagResponse (
             answer=ans,
@@ -38,10 +39,10 @@ def run_chat_rag(req: ChatRagRequest, store, embedder, model, tokenizer) -> Chat
             retrieved_count=0
         )
     else:
-        print("MODE: rag")
+        logger.info("MODE: rag")
         concat_text, used_hits, used_chunks, used_chars = build_context(hits)
 
-        print(f"CTX: effective_top_k={effective_top_k}, used_chunks={used_chunks}, used_chars={used_chars}")
+        logger.info(f"CTX: effective_top_k={effective_top_k}, used_chunks={used_chunks}, used_chars={used_chars}")
 
         sources_out = build_sources_out(used_hits, req.debug)
 

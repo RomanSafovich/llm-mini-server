@@ -10,8 +10,9 @@ from app.schemas import (
     ChatResponse
 )
 from transformers import (
-    AutoModelForCausalLM, 
-    AutoTokenizer
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig
 )
 import torch
 import uvicorn
@@ -21,6 +22,7 @@ from app.embeddings.embedder import Embedder
 from app.llm import generate_text
 from app.ingest import run_ingest
 from app.rag import run_chat_rag
+from app.logger import logger
 
 app = FastAPI()
 
@@ -29,25 +31,41 @@ store = MilvusVectorStore()
 
 embedder = Embedder(model_name="BAAI/bge-small-en-v1.5")
 
-print("Loading model... this may take a minute ⏳")
+logger.info(f"Loading model {config.MODEL_NAME}... this may take a minute ⏳")
 tokenizer = AutoTokenizer.from_pretrained(config.MODEL_NAME)
 
 # GPU if available; otherwise CPU
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # using float32 for CPU; using float16 for GPU
-dtype = torch.float16 if device == "cuda" else torch.float32
+# dtype = torch.bfloat16 if device == "cuda" else torch.float32
 
-model = AutoModelForCausalLM.from_pretrained(
-    config.MODEL_NAME,
-    torch_dtype=dtype,
-    low_cpu_mem_usage=True,  # helpful even without accelerate
-)
+if device == "cuda":
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_compute_dtype=torch.bfloat16,
+    )
 
-model.to(device)
-print("Model loaded ✅")
-print("Model loaded ✅ (cuda? ", torch.cuda.is_available(), ")")
+    model = AutoModelForCausalLM.from_pretrained(
+        config.MODEL_NAME,
+        quantization_config=bnb_config,
+        low_cpu_mem_usage=True,
+        device_map="auto",
+    )
+else:
+    model = AutoModelForCausalLM.from_pretrained(
+        config.MODEL_NAME,
+        torch_dtype=torch.float32,
+        low_cpu_mem_usage=True,
+    )
+
+
+# model.to(device)
+logger.info(f"Model loaded successfully (CUDA: {torch.cuda.is_available()}) ✅")
 model.eval()
+
 
 @app.get("/documents", response_model=list[GetDocsResponse])
 def get_docs():
@@ -72,7 +90,7 @@ def clear_documents():
 @app.post("/ingest_text", response_model=IngestTextResponse)
 def ingest_text(req: IngestTextRequest):
     return run_ingest(req, store=store, embedder=embedder)
-    
+
 
 @app.post("/chat_rag", response_model=ChatRagResponse)
 def chat_rag(req: ChatRagRequest):
