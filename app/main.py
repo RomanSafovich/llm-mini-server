@@ -9,63 +9,29 @@ from app.schemas import (
     MessageResponse,
     ChatResponse
 )
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    BitsAndBytesConfig
-)
-import torch
+
 import uvicorn
 from app.config import settings
-from app.store.milvus_store import MilvusVectorStore
-from app.embeddings.embedder import Embedder
+from app.store.milvus_store import store
+from app.embeddings.embedder import embedder
 from app.llm import generate_text
 from app.ingest import run_ingest
 from app.rag import run_chat_rag
 from app.logger import logger
-
-app = FastAPI()
-
-
-store = MilvusVectorStore()
-
-embedder = Embedder(model_name=settings.embedder_model_name)
-
-logger.info(f"Loading model {settings.llm_model_name}... this may take a minute ⏳")
-tokenizer = AutoTokenizer.from_pretrained(settings.llm_model_name)
-
-# GPU if available; otherwise CPU
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-# using float32 for CPU; using float16 for GPU
-# dtype = torch.bfloat16 if device == "cuda" else torch.float32
-
-if device == "cuda":
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_compute_dtype=torch.bfloat16,
-    )
-
-    model = AutoModelForCausalLM.from_pretrained(
-        settings.llm_model_name,
-        quantization_config=bnb_config,
-        low_cpu_mem_usage=True,
-        device_map="auto",
-    )
-else:
-    model = AutoModelForCausalLM.from_pretrained(
-        settings.llm_model_name,
-        torch_dtype=torch.float32,
-        low_cpu_mem_usage=True,
-    )
+from app.models import llm_manager
+from contextlib import asynccontextmanager
 
 
-# model.to(device)
-logger.info(f"Model loaded successfully (CUDA: {torch.cuda.is_available()}) ✅")
-model.eval()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting up services...")
+    llm_manager.load_model()
+    embedder.load_embedder(model_name=settings.embedder_model_name)
+    store.load_milvus_store()
+    yield
+    logger.info("Shutting down services...")
 
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/documents", response_model=list[GetDocsResponse])
 def get_docs():
@@ -94,15 +60,14 @@ def ingest_text(req: IngestTextRequest):
 
 @app.post("/chat_rag", response_model=ChatRagResponse)
 def chat_rag(req: ChatRagRequest):
-    return run_chat_rag(req, store=store, embedder=embedder, model=model, tokenizer=tokenizer)
+    return run_chat_rag(req, store=store, embedder=embedder, model=llm_manager.model, tokenizer=llm_manager.tokenizer)
 
 
 @app.post("/chat", response_model=ChatResponse)
 def chat_llm(prompt: Prompt):
     return {
-        "answer": generate_text(prompt.prompt, tokenizer=tokenizer, model=model)
+        "answer": generate_text(prompt.prompt, tokenizer=llm_manager.tokenizer, model=llm_manager.model)
     }
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

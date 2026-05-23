@@ -1,21 +1,4 @@
 from typing import Protocol
-# from dataclasses import dataclass
-
-# @dataclass
-# class StoreItem:
-#     id: str
-#     text: str
-#     embedding: list[float]
-#     metadata: dict
-
-
-# @dataclass
-# class StoreHit:
-#     id: str
-#     text: str
-#     score: float
-#     embedding: list[float]
-#     metadata: dict
 
 
 class VectorStore(Protocol): 
