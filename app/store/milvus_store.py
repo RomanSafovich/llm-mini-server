@@ -1,11 +1,23 @@
+from typing_extensions import Self
 from .base import VectorStore
 from pymilvus import MilvusClient, DataType
 from collections import Counter
 from app.logger import logger
+from app.config import settings
 
 
 class MilvusVectorStore(VectorStore):
-    def __init__(self, uri="http://milvus-standalone:19530", collection_name :str="document_chunks", embedding_dim=384):
+    _instance = None
+
+    def __new__(cls) -> Self:
+        if cls._instance == None:
+            cls._instance = super().__new__(cls)
+            cls._instance.uri = None
+            cls._instance.embedding_dim = None
+            cls._instance.client = None
+        return cls._instance
+
+    def load_milvus_store(self, uri=settings.milvus_uri, collection_name :str=settings.collection_name, embedding_dim=settings.embedding_dim):
         self.uri = uri
         self.collection_name = collection_name
         self.embedding_dim = embedding_dim
@@ -148,3 +160,6 @@ class MilvusVectorStore(VectorStore):
             output_fields=["count(*)"],
         )
         return count_res[0]["count(*)"]
+    
+
+store = MilvusVectorStore()

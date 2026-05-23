@@ -1,10 +1,20 @@
+from typing_extensions import Self
 from sentence_transformers import SentenceTransformer
 import torch
 import numpy as np
 
 class Embedder:
-    def __init__(self, model_name="BAAI/bge-small-en-v1.5"):
-        # optional to do embedding on cuda
+    _instance = None
+
+    def __new__(cls) -> Self:
+        if cls._instance == None:
+            cls._instance = super().__new__(cls)
+            cls._instance.device = None
+            cls._instance.model = None
+
+        return cls._instance
+
+    def load_embedder(self, model_name="BAAI/bge-small-en-v1.5"):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = SentenceTransformer(model_name, device=self.device)
 
@@ -18,7 +28,7 @@ class Embedder:
 
     def encode_one(self, text: str) -> np.ndarray:
         self._validate_text(text)
-        return self.model.encode(text, normalize_embeddings=True)
+        return self.model.encode(text, normalize_embeddings=True, convert_to_numpy=True)
 
 
     def encode_many(self, texts: list[str], batch_size: int = 32) -> np.ndarray:
@@ -41,3 +51,4 @@ class Embedder:
         )
 
 
+embedder = Embedder()
