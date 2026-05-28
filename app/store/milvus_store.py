@@ -10,14 +10,18 @@ class MilvusVectorStore(VectorStore):
     _instance = None
 
     def __new__(cls) -> Self:
-        if cls._instance == None:
+        if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance.uri = None
+            cls._instance.collection_name = None
             cls._instance.embedding_dim = None
             cls._instance.client = None
+            cls._instance.loaded = False
         return cls._instance
 
     def load_milvus_store(self, uri=settings.milvus_uri, collection_name :str=settings.collection_name, embedding_dim=settings.embedding_dim):
+        if self.loaded:
+            return
         self.uri = uri
         self.collection_name = collection_name
         self.embedding_dim = embedding_dim
@@ -47,6 +51,7 @@ class MilvusVectorStore(VectorStore):
 
             
         self.client.load_collection(collection_name=self.collection_name)
+        self.loaded = True
 
 
     def _validate_item(self, item):

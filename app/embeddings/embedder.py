@@ -7,7 +7,7 @@ class Embedder:
     _instance = None
 
     def __new__(cls) -> Self:
-        if cls._instance == None:
+        if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance.device = None
             cls._instance.model = None
