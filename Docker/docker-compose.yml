@@ -20,7 +20,7 @@ services:
           devices:
             - capabilities: ["gpu"]
     restart: unless-stopped
-    command: ["tail", "-f", "/dev/null"]
+    #command: ["tail", "-f", "/dev/null"]
 
 
   etcd:
