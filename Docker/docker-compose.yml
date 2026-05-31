@@ -4,7 +4,7 @@ services:
   api:
     build: .
     container_name: llm-api
-    image: mistral-fastapi
+    image: llm-mini-server
     ports:
       - "8000:8000"
     environment:
