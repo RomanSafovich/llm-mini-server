@@ -12,7 +12,6 @@ COPY requirements.txt .
 
 # HuggingFace cache directory
 ENV HF_HOME=/models \
-    TRANSFORMERS_CACHE=/models \
     PYTHONUNBUFFERED=1
 
 

@@ -76,6 +76,23 @@ def test_chat_rag():
             "retrieved_count": 5
         }
 
+def test_ingest_file():
+    with patch("app.main.run_ingest") as moc_dict:
+        moc_dict.return_value = {
+            "doc_id": "test_doc",
+            "chunks_added": 1,
+            "total_chunks": 1,
+        }
+        response = client.post(
+            "/ingest_file",
+            data={"doc_id": "test_doc"},
+            files={
+                "file": ("test.md", b"# Hello\nThis is markdown.", "text/markdown")
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["doc_id"] == "test_doc"
 
 def test_chat_llm():
     with patch("app.main.generate_text") as moc_gen:

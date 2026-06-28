@@ -9,7 +9,7 @@ The project supports document ingestion, semantic search, and source-grounded qu
 LLM Mini Server provides:
 
 * plain local LLM chat
-* text ingestion into a vector store
+* text and file ingestion into a vector store
 * RAG-based question answering over indexed documents
 * persistent vector search with Milvus
 * document lifecycle management
@@ -18,23 +18,28 @@ LLM Mini Server provides:
 
 ```mermaid
 graph TD
-       User["Client"] --> API["FastAPI API"]
+    User["Client"] --> API["FastAPI API"]
 
-       API --> Chat["/chat"]
-       Chat --> LLM["Local LLM"]
+    API --> Chat["/chat"]
+    Chat --> LLM["Local LLM"]
 
-       API --> Ingest["/ingest_text"]
-       Ingest --> Embed["Chunk + Embed"]
-       Embed --> Store["Milvus"]
+    API --> TextIngest["/ingest_text"]
+    TextIngest --> Embed["Chunk + Embed"]
 
-       API --> Rag["/chat_rag"]
-       Rag --> Retrieve["Retrieve Context"]
-       Retrieve --> Store
-       Store --> Context["Retrieved Context"]
-       Context --> LLM
+    API --> FileIngest["/ingest_file"]
+    FileIngest --> Extract["Extract Text"]
+    Extract --> Embed
 
-       API --> Docs["Document Endpoints"]
-       Docs --> Store
+    Embed --> Store["Milvus"]
+
+    API --> Rag["/chat_rag"]
+    Rag --> Retrieve["Retrieve Context"]
+    Retrieve --> Store
+    Store --> Context["Retrieved Context"]
+    Context --> LLM
+
+    API --> Docs["Document Endpoints"]
+    Docs --> Store
 ```
 
 ## Features
@@ -57,13 +62,17 @@ The RAG workflow includes:
 4. building a context window from retrieved chunks
 5. generating a grounded answer with source metadata
 
-### Text Ingestion
+### Text and File Ingestion
 
-The `/ingest_text` endpoint accepts raw text, splits it into chunks, embeds each chunk, and stores the result in Milvus.
+The `/ingest_text` endpoint accepts raw text directly.
+
+The `/ingest_file` endpoint accepts supported files, extracts their text content, and sends the extracted text through the same chunking, embedding, and storage pipeline.
 
 The ingestion pipeline includes:
 
 * input validation
+* text extraction from supported files
+* support for `.txt`, `.md`, and `.pdf` files
 * text chunking with overlap
 * embedding generation
 * vector store upsert
@@ -91,14 +100,15 @@ The API includes endpoints for managing indexed documents:
 
 ## API Endpoints
 
-| Method   | Endpoint              | Description                          |
-| -------- | --------------------- | ------------------------------------ |
-| `POST`   | `/chat`               | Plain local LLM response             |
-| `POST`   | `/chat_rag`           | RAG response using indexed documents |
-| `POST`   | `/ingest_text`        | Ingest text into the vector store    |
-| `GET`    | `/documents`          | List indexed documents               |
-| `DELETE` | `/documents/{doc_id}` | Delete a document by ID              |
-| `POST`   | `/documents/clear`    | Clear all indexed documents          |
+| Method   | Endpoint              | Description                                   |
+| -------- | --------------------- | --------------------------------------------- |
+| `POST`   | `/chat`               | Plain local LLM response                      |
+| `POST`   | `/chat_rag`           | RAG response using indexed documents          |
+| `POST`   | `/ingest_text`        | Ingest raw text into the vector store         |
+| `POST`   | `/ingest_file`        | Ingest an uploaded file into the vector store |
+| `GET`    | `/documents`          | List indexed documents                        |
+| `DELETE` | `/documents/{doc_id}` | Delete a document by ID                       |
+| `POST`   | `/documents/clear`    | Clear all indexed documents                   |
 
 ## Tech Stack
 
@@ -151,6 +161,19 @@ Example request:
   "doc_id": "rag_notes",
   "text": "Milvus is used as the persistent vector store for semantic retrieval..."
 }
+```
+
+### Ingest a file
+
+```http
+POST /ingest_file
+```
+
+Example form data:
+
+```text
+doc_id: rag_notes_file
+file: notes.md
 ```
 
 ### Ask a RAG question
@@ -207,7 +230,6 @@ The project is designed to:
 
 Future improvements may include:
 
-* file and PDF ingestion
 * query rewriting, hybrid search, and reranking
 * improved source formatting
 * conversation memory

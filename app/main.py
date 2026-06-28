@@ -1,9 +1,17 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import (
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    UploadFile
+)
+
+from app.file_extractor import extract_upload_file
 from app.schemas import (
-    Prompt, 
-    IngestTextRequest, 
-    IngestTextResponse, 
-    ChatRagRequest, 
+    Prompt,
+    IngestTextRequest,
+    IngestTextResponse,
+    ChatRagRequest,
     ChatRagResponse,
     GetDocsResponse,
     MessageResponse,
@@ -57,6 +65,15 @@ def clear_documents():
 def ingest_text(req: IngestTextRequest):
     return run_ingest(req, store=store, embedder=embedder)
 
+@app.post("/ingest_file", response_model=IngestTextResponse)
+async def ingest_file(doc_id: str = Form(...), file: UploadFile = File(...)):
+    extracted = await extract_upload_file(file)
+    req = IngestTextRequest(
+        doc_id=doc_id,
+        text=extracted.text,
+        metadata=extracted.metadata
+    )
+    return run_ingest(req, store=store, embedder=embedder)
 
 @app.post("/chat_rag", response_model=ChatRagResponse)
 def chat_rag(req: ChatRagRequest):
