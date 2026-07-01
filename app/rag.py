@@ -18,7 +18,8 @@ def run_chat_rag(req: ChatRagRequest, store, embedder, model, tokenizer) -> Chat
 
 
     if retrieved_count == 0:
-        return  ChatRagResponse(
+        logger.info("MODE: no_retrieval_hits")
+        return ChatRagResponse(
             answer="No relevant context found. Please ingest documents first.",
             sources=[],
             retrieved_count=0
@@ -31,10 +32,9 @@ def run_chat_rag(req: ChatRagRequest, store, embedder, model, tokenizer) -> Chat
     logger.info(f"top1_score={top1_score}, top2_score={top2_score}, margin={margin},top_k_scores={top_k_scores}")
 
     if top1_score < settings.score_threshold or margin < settings.margin_threshold:
-        logger.info("MODE: fallback")
-        ans = generate_text(question, tokenizer=tokenizer, model=model)
-        return ChatRagResponse (
-            answer=ans,
+        logger.info("MODE: low_confidence")
+        return ChatRagResponse(
+            answer="No sufficiently relevant information was found in the indexed documents.",
             sources=[],
             retrieved_count=0
         )
@@ -96,7 +96,7 @@ def build_context(hits):
 
 def build_sources_out(used_hits, debug):
     sources_out = []
-    for hit in used_hits:
+    for i, hit in enumerate(used_hits):
         snippet = hit["text"][:settings.source_snippet_chars]
         text = hit["text"] if debug else None
         sources_out.append(
@@ -105,6 +105,7 @@ def build_sources_out(used_hits, debug):
                 score = hit["score"],
                 metadata = hit["metadata"],
                 snippet = snippet,
+                citation = f"SOURCE {i+1}",
                 text = text
             )
         )
