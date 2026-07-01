@@ -15,18 +15,17 @@ class IngestTextResponse(BaseModel):
     chunks_added: int
     total_chunks: int
 
-
 class ChatRagRequest(BaseModel):
     question: str
     top_k: int = 3
     debug: bool = False
-
 
 class SourceOut(BaseModel):
     id: str
     score: float
     metadata: dict[str, Any]
     snippet: str
+    citation: str
     text: str | None = None
 
 class ChatRagResponse(BaseModel):
