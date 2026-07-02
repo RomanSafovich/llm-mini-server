@@ -46,7 +46,7 @@ def run_chat_rag(req: ChatRagRequest, store, embedder, model, tokenizer) -> Chat
 
         sources_out = build_sources_out(used_hits, req.debug)
 
-        augmented_prompt = build_augmented_prompt(concat_text, question, n_sources=len(used_hits))
+        augmented_prompt = build_augmented_prompt(concat_text, question)
                         
         ans = generate_text(augmented_prompt, tokenizer=tokenizer, model=model)
         return ChatRagResponse(
@@ -75,14 +75,18 @@ def retrieve_unique_hits(question, effective_top_k, store, embedder):
     return unique_hits 
 
 
+def build_citation(hit) -> str:
+    return f'{hit["metadata"]["doc_id"]}:chunk_{hit["metadata"]["chunk_index"]}'
+
+
 def build_context(hits):
     used_hits = []
     concat_text = ""
     used_chars = 0
     used_chunks = 0
-    for i, hit in enumerate(hits):
+    for hit in hits:
         snippet = hit["text"][:settings.max_chunk_snippet_chars]
-        block = f"SOURCE {i+1}\n{snippet}\n\n"
+        block = f"{build_citation(hit)}\n{snippet}\n\n"
         if len(block) + used_chars > settings.max_context_chars:
             break
         used_chars += len(block)
@@ -93,10 +97,9 @@ def build_context(hits):
     return concat_text, used_hits, used_chunks, used_chars
 
 
-
 def build_sources_out(used_hits, debug):
     sources_out = []
-    for i, hit in enumerate(used_hits):
+    for hit in used_hits:
         snippet = hit["text"][:settings.source_snippet_chars]
         text = hit["text"] if debug else None
         sources_out.append(
@@ -105,7 +108,7 @@ def build_sources_out(used_hits, debug):
                 score = hit["score"],
                 metadata = hit["metadata"],
                 snippet = snippet,
-                citation = f"SOURCE {i+1}",
+                citation = build_citation(hit),
                 text = text
             )
         )
@@ -113,13 +116,21 @@ def build_sources_out(used_hits, debug):
 
 
 
-def build_augmented_prompt(concat_text, question, n_sources):
+def build_augmented_prompt(concat_text, question):
     return "Instruction:\n" \
             "Answer using only the context below.\n" \
-            "The context is divided into blocks labeled SOURCE 1, SOURCE 2, etc. When you use a fact, cite it like [SOURCE 1] or [SOURCE 2].\n" \
-            f"Only cite sources that exist in the context: SOURCE 1 to SOURCE {n_sources}. Do not invent other source numbers.\n" \
-            "If the context does not contain the information needed to answer the question, reply exactly: \"I don’t know based on the provided context.\"\n" \
+            "Each context block begins with its exact citation label.\n" \
+            "When you use a fact, cite that label in square brackets, " \
+            "for example [doc_1:chunk_0].\n" \
+            "For multiple sources, cite each label separately, for example " \
+            "[doc_1:chunk_0] [doc_1:chunk_5]. " \
+            "Never place multiple citation labels inside one pair of brackets.\n" \
+            "Use only citation labels that appear in the context. " \
+            "Do not invent or modify citation labels.\n" \
+            "If the context does not contain the information needed to answer " \
+            "the question, reply exactly: " \
+            "\"I don't know based on the provided context.\"\n" \
             "Do not guess or add external knowledge.\n" \
             f"Context:\n{concat_text}\n" \
             f"Question:\n{question}\n" \
-            f"Answer:\n"
+            "Answer:\n"
