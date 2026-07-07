@@ -13,7 +13,7 @@ def run_chat_rag(req: ChatRagRequest, store, embedder, model, tokenizer) -> Chat
 
 
     effective_top_k = min(req.top_k, settings.max_top_k)
-    hits = retrieve_unique_hits(question, effective_top_k=effective_top_k, store=store, embedder=embedder)
+    hits = retrieve_unique_hits(question, effective_top_k=effective_top_k, store=store, embedder=embedder, doc_id=req.doc_id)
     retrieved_count = len(hits)
 
 
@@ -31,7 +31,7 @@ def run_chat_rag(req: ChatRagRequest, store, embedder, model, tokenizer) -> Chat
     top_k_scores = [h["score"] for h in hits]
     logger.info(f"top1_score={top1_score}, top2_score={top2_score}, margin={margin},top_k_scores={top_k_scores}")
 
-    if top1_score < settings.score_threshold or margin < settings.margin_threshold:
+    if top1_score < settings.score_threshold:
         logger.info("MODE: low_confidence")
         return ChatRagResponse(
             answer="No sufficiently relevant information was found in the indexed documents.",
@@ -56,9 +56,13 @@ def run_chat_rag(req: ChatRagRequest, store, embedder, model, tokenizer) -> Chat
         )
 
 
-def retrieve_unique_hits(question, effective_top_k, store, embedder):
+def retrieve_unique_hits(question, effective_top_k, store, embedder, doc_id):
+    filter_expr = None
+    if doc_id:
+        filter_expr = f'doc_id == "{doc_id}"'
+
     query_embedding = embedder.encode_one(question)
-    hits = store.search(query_embedding, effective_top_k)
+    hits = store.search(query_embedding, effective_top_k, filters=filter_expr)
     unique_hits = []
     for hit in hits:
         sim = 0
