@@ -110,6 +110,7 @@ def test_chat_llm():
           "invalid doc id",
           'doc"1',
           "a" * (settings.doc_id_max_length + 1),
+          ""
       ],
 )
 def test_chat_rag_rejects_invalid_doc_id(invalid_doc_id):
