@@ -40,7 +40,7 @@ class MilvusVectorStore(VectorStore):
             schema.add_field("id", DataType.VARCHAR, max_length=256, is_primary=True)
             schema.add_field("chunk_text", DataType.VARCHAR, max_length=8192)
             schema.add_field("embedding", DataType.FLOAT_VECTOR, dim=self.embedding_dim)
-            schema.add_field("doc_id", DataType.VARCHAR, max_length=128)
+            schema.add_field("doc_id", DataType.VARCHAR, max_length=settings.doc_id_max_length)
             schema.add_field("chunk_index", DataType.INT64)
             
             self.client.create_collection(
@@ -91,15 +91,17 @@ class MilvusVectorStore(VectorStore):
         if top_k <= 0:
             raise ValueError("top_k must be a positive number")
 
-
-        res = self.client.search(
-            collection_name=self.collection_name,
-            anns_field="embedding",
-            data=[query_embedding],
-            limit=top_k,
-            output_fields=["chunk_text", "doc_id", "chunk_index", "embedding"],
-            search_params={"metric_type": "COSINE"}
-        )
+        search_args = {
+            "collection_name": self.collection_name,
+            "anns_field": "embedding",
+            "data": [query_embedding],
+            "limit": top_k,
+            "output_fields": ["chunk_text", "doc_id", "chunk_index", "embedding"],
+            "search_params": {"metric_type": "COSINE"},
+        }
+        if filters is not None:
+            search_args["filter"] = filters
+        res = self.client.search(**search_args)
 
         for hits in res:
             for hit in hits:

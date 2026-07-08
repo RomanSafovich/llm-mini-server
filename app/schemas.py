@@ -1,5 +1,6 @@
 from typing import Any
 from pydantic import BaseModel, Field
+from app.config import settings
 
 
 class Prompt(BaseModel):
@@ -19,6 +20,13 @@ class ChatRagRequest(BaseModel):
     question: str
     top_k: int = 3
     debug: bool = False
+    doc_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=settings.doc_id_max_length,
+        pattern=r"^[A-Za-z0-9_.-]+$",
+        examples=[None]
+    )
 
 class SourceOut(BaseModel):
     id: str
@@ -39,7 +47,6 @@ class GetDocsResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
-
 
 class ChatResponse(BaseModel):
     answer: str

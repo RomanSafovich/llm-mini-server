@@ -1,7 +1,9 @@
 from fastapi.testclient import TestClient
+import pytest
 from app.main import app
 from unittest.mock import patch
 from fastapi import HTTPException
+from app.config import settings
 
 
 client = TestClient(app)
@@ -100,3 +102,20 @@ def test_chat_llm():
         response = client.post("/chat", json={"prompt": "hello"})
         assert response.status_code == 200
         assert response.json() == {"answer": "hello world"}
+
+
+@pytest.mark.parametrize(
+      "invalid_doc_id",
+      [
+          "invalid doc id",
+          'doc"1',
+          "a" * (settings.doc_id_max_length + 1),
+          ""
+      ],
+)
+def test_chat_rag_rejects_invalid_doc_id(invalid_doc_id):
+    with patch("app.main.run_chat_rag") as mock_run:
+        response = client.post("/chat_rag", json={"question": "test_question", "top_k": 3, "debug": False, "doc_id": invalid_doc_id})
+        assert response.status_code == 422
+        assert "detail" in response.json()
+        mock_run.assert_not_called()

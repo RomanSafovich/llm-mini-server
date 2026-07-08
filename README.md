@@ -100,15 +100,15 @@ The API includes endpoints for managing indexed documents:
 
 ## API Endpoints
 
-| Method   | Endpoint              | Description                                   |
-| -------- | --------------------- | --------------------------------------------- |
-| `POST`   | `/chat`               | Plain local LLM response                      |
-| `POST`   | `/chat_rag`           | RAG response using indexed documents          |
-| `POST`   | `/ingest_text`        | Ingest raw text into the vector store         |
-| `POST`   | `/ingest_file`        | Ingest an uploaded file into the vector store |
-| `GET`    | `/documents`          | List indexed documents                        |
-| `DELETE` | `/documents/{doc_id}` | Delete a document by ID                       |
-| `POST`   | `/documents/clear`    | Clear all indexed documents                   |
+| Method   | Endpoint              | Description                                             |
+| -------- | --------------------- | ------------------------------------------------------- |
+| `POST`   | `/chat`               | Plain local LLM response                                |
+| `POST`   | `/chat_rag`           | RAG response using all documents or a specific `doc_id` |
+| `POST`   | `/ingest_text`        | Ingest raw text into the vector store                   |
+| `POST`   | `/ingest_file`        | Ingest an uploaded file into the vector store           |
+| `GET`    | `/documents`          | List indexed documents                                  |
+| `DELETE` | `/documents/{doc_id}` | Delete a document by ID                                 |
+| `POST`   | `/documents/clear`    | Clear all indexed documents                             |
 
 ## Tech Stack
 
@@ -176,7 +176,7 @@ doc_id: rag_notes_file
 file: notes.md
 ```
 
-### Ask a RAG question
+### Ask a RAG question across all documents
 
 ```http
 POST /chat_rag
@@ -188,7 +188,25 @@ Example request:
 {
   "question": "What vector database does this project use?",
   "top_k": 5,
-  "debug": true
+  "debug": true,
+  "doc_id": null
+}
+```
+
+### Ask a RAG question for a specific document
+
+```http
+POST /chat_rag
+```
+
+Example request:
+
+```json
+{
+  "question": "What vector database does this project use?",
+  "top_k": 5,
+  "debug": true,
+  "doc_id": "rag_notes"
 }
 ```
 
