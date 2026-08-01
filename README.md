@@ -2,7 +2,7 @@
 
 A local **RAG (Retrieval-Augmented Generation)** backend built with **FastAPI**, **Milvus**, **sentence-transformers**, and a local LLM.
 
-The project supports document ingestion, semantic search, and source-grounded question answering over locally indexed documents.
+The project supports document ingestion, semantic search, source-grounded question answering, and document comparison over locally indexed documents.
 
 ## Overview
 
@@ -11,6 +11,7 @@ LLM Mini Server provides:
 * plain local LLM chat
 * text and file ingestion into a vector store
 * RAG-based question answering over indexed documents
+* document comparison over indexed documents
 * persistent vector search with Milvus
 * document lifecycle management
 
@@ -38,6 +39,12 @@ graph TD
     Store --> Context["Retrieved Context"]
     Context --> LLM
 
+    API --> Compare["/compare_documents_agent"]
+    Compare --> CompareRetrieve["Retrieve Evidence per Document"]
+    CompareRetrieve --> Store
+    CompareRetrieve --> CompareContext["Comparison Context"]
+    CompareContext --> LLM
+
     API --> Docs["Document Endpoints"]
     Docs --> Store
 ```
@@ -61,6 +68,20 @@ The RAG workflow includes:
 3. filtering duplicate or low-quality context
 4. building a context window from retrieved chunks
 5. generating a grounded answer with source metadata
+
+### Document Comparison Agent
+
+The `/compare_documents_agent` endpoint compares two indexed documents using retrieved evidence from each document.
+
+The comparison workflow includes:
+
+1. validating the comparison request
+2. retrieving evidence separately for each document
+3. building a comparison context with citation labels
+4. generating a structured comparison with the local LLM
+5. returning a summary, recommendation, winner, comparison items, gaps, risks, next actions, and sources
+
+The request accepts two document references, an optional list of comparison criteria, `top_k_per_document`, and `debug`.
 
 ### Text and File Ingestion
 
@@ -100,20 +121,22 @@ The API includes endpoints for managing indexed documents:
 
 ## API Endpoints
 
-| Method   | Endpoint              | Description                                             |
-| -------- | --------------------- | ------------------------------------------------------- |
-| `POST`   | `/chat`               | Plain local LLM response                                |
-| `POST`   | `/chat_rag`           | RAG response using all documents or a specific `doc_id` |
-| `POST`   | `/ingest_text`        | Ingest raw text into the vector store                   |
-| `POST`   | `/ingest_file`        | Ingest an uploaded file into the vector store           |
-| `GET`    | `/documents`          | List indexed documents                                  |
-| `DELETE` | `/documents/{doc_id}` | Delete a document by ID                                 |
-| `POST`   | `/documents/clear`    | Clear all indexed documents                             |
+| Method   | Endpoint                   | Description                                             |
+| -------- | -------------------------- | ------------------------------------------------------- |
+| `POST`   | `/chat`                    | Plain local LLM response                                |
+| `POST`   | `/chat_rag`                | RAG response using all documents or a specific `doc_id` |
+| `POST`   | `/compare_documents_agent` | Compare two indexed documents using retrieved evidence  |
+| `POST`   | `/ingest_text`             | Ingest raw text into the vector store                   |
+| `POST`   | `/ingest_file`             | Ingest an uploaded file into the vector store           |
+| `GET`    | `/documents`               | List indexed documents                                  |
+| `DELETE` | `/documents/{doc_id}`      | Delete a document by ID                                 |
+| `POST`   | `/documents/clear`         | Clear all indexed documents                             |
 
 ## Tech Stack
 
 * **Backend:** FastAPI, Pydantic, Uvicorn, Python
 * **LLM / Embeddings:** Hugging Face Transformers, sentence-transformers, local instruction-tuned LLM
+* **Agent workflow:** LangGraph
 * **Vector database:** Milvus, Attu
 * **Infrastructure:** Docker, Docker Compose
 * **Testing:** pytest, FastAPI TestClient, unittest / mocking
@@ -210,6 +233,37 @@ Example request:
 }
 ```
 
+### Compare two documents
+
+```http
+POST /compare_documents_agent
+```
+
+Example request:
+
+```json
+{
+  "question": "Which document gives a stronger explanation of the retrieval design?",
+  "documents": [
+    {
+      "doc_id": "rag_notes",
+      "label": "RAG notes"
+    },
+    {
+      "doc_id": "implementation_notes",
+      "label": "Implementation notes"
+    }
+  ],
+  "criteria": [
+    "relevance to the question",
+    "specific evidence",
+    "risks or missing details"
+  ],
+  "top_k_per_document": 5,
+  "debug": false
+}
+```
+
 ### Ask a plain chat question
 
 ```http
@@ -261,9 +315,10 @@ The current endpoint design is:
 
 * `/chat` — plain local LLM response
 * `/chat_rag` — single retrieval + grounded answer
+* `/compare_documents_agent` — evidence-based comparison of two indexed documents
 * `/research_agent` — multi-step retrieval and reasoning over documents
 
-This keeps the existing API simple while leaving room for a controlled tool-using agent workflow later.
+This keeps the existing API simple while leaving room for additional controlled tool-using agent workflows later.
 
 ## License
 
