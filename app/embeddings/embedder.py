@@ -1,7 +1,9 @@
-from typing_extensions import Self
-from sentence_transformers import SentenceTransformer
-import torch
+from typing import Self
+
 import numpy as np
+import torch
+from sentence_transformers import SentenceTransformer
+
 
 class Embedder:
     _instance = None
@@ -18,7 +20,6 @@ class Embedder:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = SentenceTransformer(model_name, device=self.device)
 
-
     def _validate_text(self, text):
         if not isinstance(text, str):
             raise TypeError(f"text must be str, got {type(text).__name__}")
@@ -30,7 +31,6 @@ class Embedder:
         self._validate_text(text)
         return self.model.encode(text, normalize_embeddings=True, convert_to_numpy=True)
 
-
     def encode_many(self, texts: list[str], batch_size: int = 32) -> np.ndarray:
         if not isinstance(texts, list):
             raise TypeError("texts must be a list")
@@ -38,16 +38,11 @@ class Embedder:
         if len(texts) == 0:
             raise ValueError("texts is an empty list")
 
-
-        for text in texts: 
+        for text in texts:
             self._validate_text(text)
 
-
         return self.model.encode(
-            texts, 
-            batch_size=batch_size, 
-            show_progress_bar=False, 
-            normalize_embeddings=True
+            texts, batch_size=batch_size, show_progress_bar=False, normalize_embeddings=True
         )
 
 

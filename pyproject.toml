@@ -1,0 +1,21 @@
+[tool.ruff]
+# Keep lines readable without forcing too many awkward breaks.
+line-length = 100
+
+# Project runs on Python 3.11.
+target-version = "py311"
+
+[tool.ruff.lint]
+# E  = pycodestyle style errors
+# F  = Pyflakes checks, like unused imports / undefined names
+# I  = import sorting, replaces basic isort
+# UP = modern Python syntax suggestions
+# B  = bugbear, catches likely bugs
+select = ["E", "F", "I", "UP", "B"]
+
+ignore = ["B008"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

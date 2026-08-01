@@ -1,5 +1,5 @@
-from json import JSONDecodeError
 import json
+from json import JSONDecodeError
 from textwrap import dedent
 from typing import Any, Required, TypedDict
 
@@ -7,15 +7,15 @@ from fastapi import HTTPException
 from langgraph.graph import END, START, StateGraph
 from pydantic import ValidationError
 
+from app.config import settings
 from app.llm import generate_text
 from app.rag import build_citation, retrieve_unique_hits
 from app.schemas import (
     CompareDocumentsAgentRequest,
     CompareDocumentsAgentResponse,
     ComparisonEvidence,
-    ComparisonItem
+    ComparisonItem,
 )
-from app.config import settings
 
 
 class CompareAgentState(TypedDict, total=False):
@@ -104,7 +104,7 @@ def _retrieve_document_evidence(req: CompareDocumentsAgentRequest, store, embedd
         doc["doc_id"],
     )
     if not hits:
-        raise HTTPException(status_code=400, detail=f'no evidence found for {doc["label"]}')
+        raise HTTPException(status_code=400, detail=f"no evidence found for {doc['label']}")
     return hits
 
 
@@ -116,7 +116,7 @@ def _build_comparison_sources(hits, doc) -> list[ComparisonEvidence]:
             doc_id=doc["doc_id"],
             label=doc["label"],
             chunk_index=hit["metadata"]["chunk_index"],
-            snippet=hit["text"][:settings.source_snippet_chars],
+            snippet=hit["text"][: settings.source_snippet_chars],
             score=hit["score"],
         )
         comparison_evidence_list.append(comparison_evidence)
@@ -125,13 +125,13 @@ def _build_comparison_sources(hits, doc) -> list[ComparisonEvidence]:
 
 
 def _build_comparison_context(hits_a, hits_b, doc_a, doc_b) -> str:
-    context_str = f'Document A: {doc_a["label"]}\n'
+    context_str = f"Document A: {doc_a['label']}\n"
     for hit in hits_a:
         citation = build_citation(hit)
         text = hit["text"]
         context_str += f"Citation: {citation}\nText: {text}\n\n"
 
-    context_str += f'\nDocument B: {doc_b["label"]}\n'
+    context_str += f"\nDocument B: {doc_b['label']}\n"
     for hit in hits_b:
         citation = build_citation(hit)
         text = hit["text"]
@@ -143,7 +143,7 @@ def _build_comparison_context(hits_a, hits_b, doc_a, doc_b) -> str:
 def _build_comparison_prompt(question, criteria, context, doc_a, doc_b) -> str:
     criteria_str = "\n".join(f"- {crit}" for crit in criteria)
 
-    prompt = dedent(f'''
+    prompt = dedent(f"""
             Instruction:
             Compare Document A and Document B using only the provided context.
             Do not use outside knowledge.
@@ -186,7 +186,7 @@ def _build_comparison_prompt(question, criteria, context, doc_a, doc_b) -> str:
                 "risks": [],
                 "next_actions": []
             }}
-            ''').strip()
+            """).strip()
 
     return prompt
 
@@ -198,7 +198,7 @@ def _extract_json_object(raw_response: str) -> str:
     if start == -1 or end == -1 or end <= start:
         raise HTTPException(status_code=502, detail="model returned invalid JSON")
 
-    return raw_response[start:end + 1]
+    return raw_response[start : end + 1]
 
 
 def _parse_comparison_response(raw_response, sources, debug=False) -> CompareDocumentsAgentResponse:
@@ -230,7 +230,6 @@ def _parse_comparison_response(raw_response, sources, debug=False) -> CompareDoc
                 )
             )
 
-
         debug_info = None
         if debug:
             debug_info = {
@@ -247,14 +246,16 @@ def _parse_comparison_response(raw_response, sources, debug=False) -> CompareDoc
             risks=response["risks"],
             next_actions=response["next_actions"],
             sources=sources,
-            debug_info=debug_info
+            debug_info=debug_info,
         )
 
     except JSONDecodeError:
-        raise HTTPException(status_code=502, detail="model returned invalid JSON")
+        raise HTTPException(status_code=502, detail="model returned invalid JSON") from None
 
     except (KeyError, TypeError, ValidationError, AttributeError):
-        raise HTTPException(status_code=502, detail="model returned invalid comparison structure")
+        raise HTTPException(
+            status_code=502, detail="model returned invalid comparison structure"
+        ) from None
 
 
 def _prepare_inputs_node(state: CompareAgentState):
@@ -292,8 +293,12 @@ def _build_prompt_node(state: CompareAgentState):
     sources_a = _build_comparison_sources(state["hits_a"], state["doc_a"])
     sources_b = _build_comparison_sources(state["hits_b"], state["doc_b"])
     sources = sources_a + sources_b
-    context = _build_comparison_context(state["hits_a"], state["hits_b"], state["doc_a"], state["doc_b"])
-    prompt = _build_comparison_prompt(state["req"].question, state["criteria"], context, state["doc_a"], state["doc_b"])
+    context = _build_comparison_context(
+        state["hits_a"], state["hits_b"], state["doc_a"], state["doc_b"]
+    )
+    prompt = _build_comparison_prompt(
+        state["req"].question, state["criteria"], context, state["doc_a"], state["doc_b"]
+    )
     return {
         "sources": sources,
         "context": context,
@@ -302,14 +307,22 @@ def _build_prompt_node(state: CompareAgentState):
 
 
 def _generate_comparison_node(state: CompareAgentState):
-    raw_response = generate_text(state["prompt"], tokenizer=state["tokenizer"], model=state["model"], max_new_tokens=800, do_sample=False)
+    raw_response = generate_text(
+        state["prompt"],
+        tokenizer=state["tokenizer"],
+        model=state["model"],
+        max_new_tokens=800,
+        do_sample=False,
+    )
     return {
         "raw_response": raw_response,
     }
 
 
 def _parse_response_node(state: CompareAgentState):
-    response = _parse_comparison_response(state["raw_response"], state["sources"], debug=state["req"].debug)
+    response = _parse_comparison_response(
+        state["raw_response"], state["sources"], debug=state["req"].debug
+    )
     return {
         "response": response,
     }
@@ -329,10 +342,7 @@ def _build_compare_graph():
     graph.add_edge("prepare_inputs", "retrieve_doc_a")
     graph.add_edge("prepare_inputs", "retrieve_doc_b")
 
-    graph.add_edge(
-        ["retrieve_doc_a", "retrieve_doc_b"],
-        "build_prompt"
-    )
+    graph.add_edge(["retrieve_doc_a", "retrieve_doc_b"], "build_prompt")
 
     graph.add_edge("build_prompt", "generate_comparison")
     graph.add_edge("generate_comparison", "parse_response")
@@ -340,7 +350,10 @@ def _build_compare_graph():
 
     return graph.compile()
 
-def run_compare_documents_agent(req: CompareDocumentsAgentRequest, store, embedder, model, tokenizer):
+
+def run_compare_documents_agent(
+    req: CompareDocumentsAgentRequest, store, embedder, model, tokenizer
+):
     initial_state: CompareAgentState = {
         "req": req,
         "store": store,

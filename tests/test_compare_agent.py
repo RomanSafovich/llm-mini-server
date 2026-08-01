@@ -1,10 +1,17 @@
-
 from unittest.mock import Mock, patch
 
-from fastapi import HTTPException
 import pytest
+from fastapi import HTTPException
 
-from app.compare_agent import DEFAULT_COMPARISON_CRITERIA, _extract_json_object, _parse_comparison_response, _prepare_criteria, _prepare_label, _validate_compare_request, run_compare_documents_agent
+from app.compare_agent import (
+    DEFAULT_COMPARISON_CRITERIA,
+    _extract_json_object,
+    _parse_comparison_response,
+    _prepare_criteria,
+    _prepare_label,
+    _validate_compare_request,
+    run_compare_documents_agent,
+)
 from app.schemas import CompareDocumentRef, CompareDocumentsAgentRequest, ComparisonEvidence
 
 
@@ -281,6 +288,7 @@ def test_run_compare_documents_agent_returns_structured_response():
         patch("app.compare_agent.retrieve_unique_hits") as mock_retrieve,
         patch("app.compare_agent.generate_text") as mock_generate,
     ):
+
         def fake_retrieve(_question, _effective_top_k, _store, _embedder, doc_id):
             if doc_id == "doc_a":
                 return [hit_a]

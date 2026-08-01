@@ -1,7 +1,10 @@
-from fastapi import HTTPException
 import torch
+from fastapi import HTTPException
 
-def generate_text(prompt_str, model, tokenizer, max_new_tokens=200, do_sample=True, top_p=0.9, temperature=0.7):
+
+def generate_text(
+    prompt_str, model, tokenizer, max_new_tokens=200, do_sample=True, top_p=0.9, temperature=0.7
+):
     try:
         inputs = tokenizer(prompt_str, return_tensors="pt").to(model.device)
         input_len = inputs["input_ids"].shape[1]
@@ -11,10 +14,10 @@ def generate_text(prompt_str, model, tokenizer, max_new_tokens=200, do_sample=Tr
                 max_new_tokens=max_new_tokens,
                 do_sample=do_sample,
                 top_p=top_p,
-                temperature=temperature
+                temperature=temperature,
             )
             new_tokens = output_tokens[0][input_len:]
             response = tokenizer.decode(new_tokens, skip_special_tokens=True)
         return response.strip()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from None

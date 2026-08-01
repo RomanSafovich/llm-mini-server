@@ -1,5 +1,7 @@
-from app.ingest import chunk_text
 import pytest
+
+from app.ingest import chunk_text
+
 
 def test_chunk_text():
     text = "abcdefghij"

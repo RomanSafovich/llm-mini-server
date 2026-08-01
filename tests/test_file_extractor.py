@@ -1,9 +1,9 @@
-
 from io import BytesIO
 from pathlib import Path
+
+import pytest
 from fastapi import HTTPException, UploadFile
 from pypdf import PdfWriter
-import pytest
 
 from app.file_extractor import extract_pdf, extract_upload_file
 
@@ -17,10 +17,7 @@ from app.file_extractor import extract_pdf, extract_upload_file
 )
 @pytest.mark.anyio
 async def test_extractor_text_files(filename, content, expected_extension):
-    file = UploadFile(
-        filename=filename,
-        file=BytesIO(content)
-    )
+    file = UploadFile(filename=filename, file=BytesIO(content))
 
     res = await extract_upload_file(file)
     assert res.text == content.decode("utf-8")
@@ -30,10 +27,7 @@ async def test_extractor_text_files(filename, content, expected_extension):
 
 @pytest.mark.anyio
 async def test_extractor_unsupported_extension():
-    file = UploadFile(
-        filename="test.tst",
-        file=BytesIO(b"Hello\nThis is text.")
-    )
+    file = UploadFile(filename="test.tst", file=BytesIO(b"Hello\nThis is text."))
     with pytest.raises(HTTPException) as exc:
         await extract_upload_file(file)
 
@@ -43,10 +37,7 @@ async def test_extractor_unsupported_extension():
 
 @pytest.mark.anyio
 async def test_extractor_empty_file():
-    file = UploadFile(
-        filename="test.md",
-        file=BytesIO()
-    )
+    file = UploadFile(filename="test.md", file=BytesIO())
     with pytest.raises(HTTPException) as exc:
         await extract_upload_file(file)
 
@@ -56,10 +47,7 @@ async def test_extractor_empty_file():
 
 @pytest.mark.anyio
 async def test_extractor_invalid_utf8():
-    file = UploadFile(
-        filename="test.md",
-        file=BytesIO(b"\xff\xfe\xfa")
-    )
+    file = UploadFile(filename="test.md", file=BytesIO(b"\xff\xfe\xfa"))
     with pytest.raises(HTTPException) as exc:
         await extract_upload_file(file)
 
@@ -91,10 +79,7 @@ def test_extract_pdf_rejects_encrypted_pdf():
 
 @pytest.mark.anyio
 async def test_corrupted_pdf():
-    file = UploadFile(
-        filename="test.pdf",
-        file=BytesIO(b"This is not a real PDF.")
-    )
+    file = UploadFile(filename="test.pdf", file=BytesIO(b"This is not a real PDF."))
 
     with pytest.raises(HTTPException) as exc:
         await extract_upload_file(file)
@@ -123,10 +108,7 @@ async def test_extractor_valid_pdf():
 @pytest.mark.anyio
 async def test_no_extractable_text_pdf():
     content = make_pdf_bytes()
-    file = UploadFile(
-        filename="test.pdf",
-        file=BytesIO(content)
-    )
+    file = UploadFile(filename="test.pdf", file=BytesIO(content))
 
     with pytest.raises(HTTPException) as exc:
         await extract_upload_file(file)
@@ -137,10 +119,7 @@ async def test_no_extractable_text_pdf():
 
 @pytest.mark.anyio
 async def test_extractor_missing_filename():
-    file = UploadFile(
-        filename="",
-        file=BytesIO(b"Hello\nThis is text.")
-    )
+    file = UploadFile(filename="", file=BytesIO(b"Hello\nThis is text."))
     with pytest.raises(HTTPException) as exc:
         await extract_upload_file(file)
 

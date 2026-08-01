@@ -1,12 +1,11 @@
-
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
 from typing import Any
-from pypdf import PdfReader
-from io import BytesIO
-from pypdf.errors import PdfReadError
 
 from fastapi import HTTPException, UploadFile
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 
 @dataclass
@@ -19,15 +18,10 @@ def extract_text(content: bytes) -> ExtractedFile:
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError:
-        raise HTTPException(
-            status_code=400,
-            detail="File must be valid UTF-8 text"
-        )
+        raise HTTPException(status_code=400, detail="File must be valid UTF-8 text") from None
 
-    return ExtractedFile(
-        text=text,
-        metadata={}
-    )
+    return ExtractedFile(text=text, metadata={})
+
 
 def extract_pdf(content: bytes) -> ExtractedFile:
     try:
@@ -47,16 +41,14 @@ def extract_pdf(content: bytes) -> ExtractedFile:
                 detail="PDF contains no extractable text",
             )
 
-        return ExtractedFile(text="\n\n".join(pages_text), metadata={"page_count": len(reader.pages)})
+        return ExtractedFile(
+            text="\n\n".join(pages_text), metadata={"page_count": len(reader.pages)}
+        )
     except PdfReadError:
-        raise HTTPException(status_code=400, detail="Invalid or corrupted PDF")
+        raise HTTPException(status_code=400, detail="Invalid or corrupted PDF") from None
 
 
-EXTRACTORS = {
-    ".md": extract_text,
-    ".txt": extract_text,
-    ".pdf": extract_pdf
-}
+EXTRACTORS = {".md": extract_text, ".txt": extract_text, ".pdf": extract_pdf}
 
 
 async def extract_upload_file(file: UploadFile) -> ExtractedFile:
@@ -66,9 +58,10 @@ async def extract_upload_file(file: UploadFile) -> ExtractedFile:
     extension = Path(file.filename).suffix.lower()
     extractor = EXTRACTORS.get(extension)
     if extractor is None:
+        supported_types = ", ".join(EXTRACTORS.keys())
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type: {extension}. Supported types: {list(EXTRACTORS.keys())}",
+            detail=f"Unsupported file type: {extension}. Supported types: {supported_types}",
         )
 
     content = await file.read()
@@ -83,7 +76,4 @@ async def extract_upload_file(file: UploadFile) -> ExtractedFile:
         "extension": extension,
         **extracted.metadata,
     }
-    return ExtractedFile(
-        text=extracted.text,
-        metadata=metadata
-    )
+    return ExtractedFile(text=extracted.text, metadata=metadata)

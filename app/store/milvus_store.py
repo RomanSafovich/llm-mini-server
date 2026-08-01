@@ -1,9 +1,12 @@
-from typing_extensions import Self
-from .base import VectorStore
-from pymilvus import MilvusClient, DataType
 from collections import Counter
-from app.logger import logger
+from typing import Self
+
+from pymilvus import DataType, MilvusClient
+
 from app.config import settings
+from app.logger import logger
+
+from .base import VectorStore
 
 
 class MilvusVectorStore(VectorStore):
@@ -19,7 +22,12 @@ class MilvusVectorStore(VectorStore):
             cls._instance.loaded = False
         return cls._instance
 
-    def load_milvus_store(self, uri=settings.milvus_uri, collection_name :str=settings.collection_name, embedding_dim=settings.embedding_dim):
+    def load_milvus_store(
+        self,
+        uri=settings.milvus_uri,
+        collection_name: str = settings.collection_name,
+        embedding_dim=settings.embedding_dim,
+    ):
         if self.loaded:
             return
         self.uri = uri
@@ -28,12 +36,12 @@ class MilvusVectorStore(VectorStore):
         self.client = MilvusClient(uri=self.uri)
         index_params = self.client.prepare_index_params()
         index_params.add_index(
-                field_name="embedding",
-                metric_type="COSINE",
-                index_type="IVF_FLAT",
-                index_name="vector_index",
-                params={ "nlist": 128 }
-            )
+            field_name="embedding",
+            metric_type="COSINE",
+            index_type="IVF_FLAT",
+            index_name="vector_index",
+            params={"nlist": 128},
+        )
 
         if not self.client.has_collection(self.collection_name):
             schema = self.client.create_schema(auto_id=False, enable_dynamic_field=False)
@@ -42,17 +50,15 @@ class MilvusVectorStore(VectorStore):
             schema.add_field("embedding", DataType.FLOAT_VECTOR, dim=self.embedding_dim)
             schema.add_field("doc_id", DataType.VARCHAR, max_length=settings.doc_id_max_length)
             schema.add_field("chunk_index", DataType.INT64)
-            
+
             self.client.create_collection(
                 collection_name=self.collection_name,
                 index_params=index_params,
                 schema=schema,
             )
 
-            
         self.client.load_collection(collection_name=self.collection_name)
         self.loaded = True
-
 
     def _validate_item(self, item):
         if not isinstance(item, dict):
@@ -63,31 +69,27 @@ class MilvusVectorStore(VectorStore):
         if missing:
             raise ValueError(f"Missing required keys: {sorted(missing)}")
 
-
     def upsert(self, items: list[dict]):
         rows = []
         if not isinstance(items, list):
             raise TypeError(f"items must be list, got {type(items).__name__}")
 
-        for item in items: 
+        for item in items:
             self._validate_item(item)
             row = {
                 "id": item["id"],
                 "chunk_text": item["text"],
                 "embedding": item["embedding"],
                 "doc_id": item["metadata"]["doc_id"],
-                "chunk_index": item["metadata"]["chunk_index"]
+                "chunk_index": item["metadata"]["chunk_index"],
             }
             rows.append(row)
 
-        self.client.upsert(
-            collection_name=self.collection_name,
-            data=rows
-        )
+        self.client.upsert(collection_name=self.collection_name, data=rows)
 
     def search(self, query_embedding: list[float], top_k: int, filters=None) -> list[dict]:
         scored_items = []
-        
+
         if top_k <= 0:
             raise ValueError("top_k must be a positive number")
 
@@ -113,23 +115,22 @@ class MilvusVectorStore(VectorStore):
                         "embedding": hit["entity"]["embedding"],
                         "metadata": {
                             "doc_id": hit["entity"]["doc_id"],
-                            "chunk_index": hit["entity"]["chunk_index"]
-                        }
+                            "chunk_index": hit["entity"]["chunk_index"],
+                        },
                     }
                 )
-            
+
         return scored_items
 
     def delete_doc(self, doc_id: str) -> bool:
         try:
             res = self.client.delete(
-                collection_name=self.collection_name,
-                filter=f'doc_id == "{doc_id}"'
+                collection_name=self.collection_name, filter=f'doc_id == "{doc_id}"'
             )
 
             deleted = res.get("delete_count", 0)
             return deleted > 0
-                
+
         except Exception as e:
             logger.exception(f"Delete failed with error: {e}")
             return False
@@ -143,23 +144,24 @@ class MilvusVectorStore(VectorStore):
             collection_name=self.collection_name,
             # filter="", # Get everything
             output_fields=["doc_id"],
-            batch_size=100 
+            batch_size=100,
         )
 
         counts = Counter()
         try:
             while True:
-                rows = iterator.next() 
+                rows = iterator.next()
                 if not rows:
                     break
-                
+
                 counts.update([row["doc_id"] for row in rows])
 
         finally:
             iterator.close()
 
-        return [{"doc_id": doc_id, "chunk_count": chunk_count} for doc_id, chunk_count in counts.items()]
-
+        return [
+            {"doc_id": doc_id, "chunk_count": chunk_count} for doc_id, chunk_count in counts.items()
+        ]
 
     def count(self) -> int:
         count_res = self.client.query(
@@ -167,6 +169,6 @@ class MilvusVectorStore(VectorStore):
             output_fields=["count(*)"],
         )
         return count_res[0]["count(*)"]
-    
+
 
 store = MilvusVectorStore()
