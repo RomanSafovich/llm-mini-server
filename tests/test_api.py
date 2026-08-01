@@ -41,16 +41,16 @@ def test_clear_documents():
 
 def test_ingest_text():
     with patch("app.main.run_ingest") as moc_dict:
-        moc_dict.return_value = { 
-            "doc_id": "test_doc", 
-            "chunks_added": 5, 
+        moc_dict.return_value = {
+            "doc_id": "test_doc",
+            "chunks_added": 5,
             "total_chunks": 5
         }
         response = client.post("/ingest_text", json={"doc_id": "test_doc", "text": "test"})
         assert response.status_code == 200
-        assert response.json() == { 
-            "doc_id": "test_doc", 
-            "chunks_added": 5, 
+        assert response.json() == {
+            "doc_id": "test_doc",
+            "chunks_added": 5,
             "total_chunks": 5
         }
 
@@ -105,13 +105,13 @@ def test_chat_llm():
 
 
 @pytest.mark.parametrize(
-      "invalid_doc_id",
-      [
-          "invalid doc id",
-          'doc"1',
-          "a" * (settings.doc_id_max_length + 1),
-          ""
-      ],
+    "invalid_doc_id",
+    [
+        "invalid doc id",
+        'doc"1',
+        "a" * (settings.doc_id_max_length + 1),
+        ""
+    ],
 )
 def test_chat_rag_rejects_invalid_doc_id(invalid_doc_id):
     with patch("app.main.run_chat_rag") as mock_run:

@@ -6,8 +6,11 @@ from fastapi import (
     UploadFile
 )
 
+from app.compare_agent import run_compare_documents_agent
 from app.file_extractor import extract_upload_file
 from app.schemas import (
+    CompareDocumentsAgentRequest,
+    CompareDocumentsAgentResponse,
     Prompt,
     IngestTextRequest,
     IngestTextResponse,
@@ -85,6 +88,11 @@ def chat_llm(prompt: Prompt):
     return {
         "answer": generate_text(prompt.prompt, tokenizer=llm_manager.tokenizer, model=llm_manager.model)
     }
+
+
+@app.post("/compare_documents_agent", response_model=CompareDocumentsAgentResponse)
+def compare_documents_agent(req: CompareDocumentsAgentRequest):
+    return run_compare_documents_agent(req, store=store, embedder=embedder, model=llm_manager.model, tokenizer=llm_manager.tokenizer)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
