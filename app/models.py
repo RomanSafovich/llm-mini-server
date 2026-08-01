@@ -1,12 +1,10 @@
-from typing_extensions import Self
+from typing import Self
+
 import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
 from app.config import settings
 from app.logger import logger
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    BitsAndBytesConfig
-)
 
 
 class LLMManager:
@@ -14,11 +12,11 @@ class LLMManager:
 
     def __new__(cls) -> Self:
         if cls._instance is None:
-            cls._instance = super().__new__(cls) 
+            cls._instance = super().__new__(cls)
             cls._instance.model = None
             cls._instance.tokenizer = None
             cls._instance.device = None
-            
+
         return cls._instance
 
     def load_model(self):
@@ -50,5 +48,6 @@ class LLMManager:
 
         logger.info(f"Model loaded successfully (CUDA: {torch.cuda.is_available()}) ✅")
         self.model.eval()
+
 
 llm_manager = LLMManager()

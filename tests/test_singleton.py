@@ -1,7 +1,7 @@
-import pytest
 from app.embeddings.embedder import Embedder
 from app.models import LLMManager
 from app.store.milvus_store import MilvusVectorStore
+
 
 def test_embedder_singleton():
     embedder1 = Embedder()

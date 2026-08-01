@@ -1,9 +1,14 @@
-
-
-from app.rag import build_augmented_prompt, build_citation, build_context, build_sources_out, retrieve_unique_hits, run_chat_rag
 from unittest.mock import Mock, patch
 
 from app.config import settings
+from app.rag import (
+    build_augmented_prompt,
+    build_citation,
+    build_context,
+    build_sources_out,
+    retrieve_unique_hits,
+    run_chat_rag,
+)
 from app.schemas import ChatRagRequest
 
 
@@ -13,7 +18,7 @@ def test_no_hits():
     mock_embedder = Mock()
     mock_model = Mock()
     mock_tokenizer = Mock()
-    
+
     mock_store.search.return_value = []
     mock_embedder.encode_one.return_value = [0.1, 0.2]
 
@@ -26,12 +31,11 @@ def test_no_hits():
             model=mock_model,
             tokenizer=mock_tokenizer,
         )
-    
+
     assert response.answer == "No relevant context found. Please ingest documents first."
     assert response.sources == []
     assert response.retrieved_count == 0
     mock_generate.assert_not_called()
-
 
 
 def test_low_score():
@@ -39,7 +43,7 @@ def test_low_score():
     mock_embedder = Mock()
     mock_model = Mock()
     mock_tokenizer = Mock()
-    
+
     mock_store.search.return_value = [
         {
             "id": "doc_1_0",
@@ -63,7 +67,10 @@ def test_low_score():
             tokenizer=mock_tokenizer,
         )
 
-    assert response.answer == "No sufficiently relevant information was found in the indexed documents."
+    assert (
+        response.answer
+        == "No sufficiently relevant information was found in the indexed documents."
+    )
     assert response.sources == []
     assert response.retrieved_count == 0
     mock_generate.assert_not_called()
@@ -74,7 +81,7 @@ def test_confident_hits_generate_grounded_answer():
     mock_embedder = Mock()
     mock_model = Mock()
     mock_tokenizer = Mock()
-    
+
     mock_store.search.return_value = [
         {
             "id": "doc_1_0",
@@ -109,9 +116,7 @@ def test_confident_hits_generate_grounded_answer():
             tokenizer=mock_tokenizer,
         )
 
-    assert response.answer == (
-        "Grounded answer [doc_1:chunk_0] [doc_2:chunk_0]"
-    )
+    assert response.answer == ("Grounded answer [doc_1:chunk_0] [doc_2:chunk_0]")
     assert response.sources[0].citation == "doc_1:chunk_0"
     assert response.sources[1].citation == "doc_2:chunk_0"
     assert len(response.sources) == 2
@@ -130,7 +135,6 @@ def test_build_citation():
 
     response = build_citation(hit)
     assert response == "doc_1:chunk_0"
-
 
 
 def test_build_context():
@@ -185,18 +189,13 @@ def test_build_augmented_prompt():
     assert question in prompt
 
 
-
 def test_retrieve_unique_hits_without_doc_id():
     mock_store = Mock()
     mock_embedder = Mock()
     mock_embedder.encode_one.return_value = [0.1, 0.2]
     mock_store.search.return_value = []
     response = retrieve_unique_hits(
-        question="test",
-        effective_top_k=3,
-        embedder=mock_embedder,
-        store=mock_store,
-        doc_id=None
+        question="test", effective_top_k=3, embedder=mock_embedder, store=mock_store, doc_id=None
     )
 
     assert response == []
@@ -206,7 +205,6 @@ def test_retrieve_unique_hits_without_doc_id():
         3,
         filters=None,
     )
-
 
 
 def test_retrieve_unique_hits_with_doc_id():
@@ -225,11 +223,7 @@ def test_retrieve_unique_hits_with_doc_id():
     mock_embedder.encode_one.return_value = [0.1, 0.2]
     mock_store.search.return_value = [hit]
     response = retrieve_unique_hits(
-        question="test",
-        effective_top_k=3,
-        embedder=mock_embedder,
-        store=mock_store,
-        doc_id="doc_1"
+        question="test", effective_top_k=3, embedder=mock_embedder, store=mock_store, doc_id="doc_1"
     )
 
     assert response == [hit]

@@ -1,20 +1,25 @@
 from typing import Any, Literal
+
 from pydantic import BaseModel, Field
+
 from app.config import settings
 
 
 class Prompt(BaseModel):
     prompt: str
 
+
 class IngestTextRequest(BaseModel):
     doc_id: str
     text: str
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+
 class IngestTextResponse(BaseModel):
     doc_id: str
     chunks_added: int
     total_chunks: int
+
 
 class ChatRagRequest(BaseModel):
     question: str
@@ -25,8 +30,9 @@ class ChatRagRequest(BaseModel):
         min_length=1,
         max_length=settings.doc_id_max_length,
         pattern=r"^[A-Za-z0-9_.-]+$",
-        examples=[None]
+        examples=[None],
     )
+
 
 class SourceOut(BaseModel):
     id: str
@@ -36,24 +42,30 @@ class SourceOut(BaseModel):
     citation: str
     text: str | None = None
 
+
 class ChatRagResponse(BaseModel):
     answer: str
     sources: list[SourceOut] = Field(default_factory=list)
     retrieved_count: int = 0
 
+
 class GetDocsResponse(BaseModel):
     doc_id: str
     chunk_count: int
 
+
 class MessageResponse(BaseModel):
     message: str
+
 
 class ChatResponse(BaseModel):
     answer: str
 
+
 class CompareDocumentRef(BaseModel):
     doc_id: str
     label: str | None = None
+
 
 class CompareDocumentsAgentRequest(BaseModel):
     question: str
@@ -79,6 +91,7 @@ class ComparisonItem(BaseModel):
     winner: Literal["document_a", "document_b", "tie", "unclear"]
     reasoning: str
     evidence: list[ComparisonEvidence] = Field(default_factory=list)
+
 
 class CompareDocumentsAgentResponse(BaseModel):
     summary: str

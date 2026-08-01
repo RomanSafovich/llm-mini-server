@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     embedding_dim: int = 384
     doc_id_max_length: int = 128
 
-
     model_config = SettingsConfigDict(env_file=".env")
 
 
